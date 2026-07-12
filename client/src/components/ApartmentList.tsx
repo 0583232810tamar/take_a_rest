@@ -52,7 +52,6 @@ export default function ApartmentList({ onSelectApartment }: any) {
     const [city, setCity] = useState('');
     const [minBeds, setMinBeds] = useState<number | ''>('');
     const [selectedImageIndex, setSelectedImageIndex] = useState<Record<string, number>>({});
-    const [previewImageIndex, setPreviewImageIndex] = useState<Record<string, number | null>>({});
 
     const getCardImages = (apt: Apartment) => {
         if (Array.isArray(apt.images) && apt.images.length > 0) {
@@ -61,11 +60,7 @@ export default function ApartmentList({ onSelectApartment }: any) {
         return [getImageUrl(apt.mainImage || undefined)];
     };
 
-    const getCardDisplayIndex = (apt: Apartment) => {
-        const preview = previewImageIndex[apt._id];
-        if (typeof preview === 'number') return preview;
-        return selectedImageIndex[apt._id] ?? 0;
-    };
+    const getCardDisplayIndex = (apt: Apartment) => selectedImageIndex[apt._id] ?? 0;
 
     const getCardImage = (apt: Apartment) => {
         const images = getCardImages(apt);
@@ -74,14 +69,6 @@ export default function ApartmentList({ onSelectApartment }: any) {
     };
 
     const imageCount = (apt: Apartment) => getCardImages(apt).length;
-
-    const setCardPreview = (aptId: string, index: number) => {
-        setPreviewImageIndex((prev) => ({ ...prev, [aptId]: index }));
-    };
-
-    const clearCardPreview = (aptId: string) => {
-        setPreviewImageIndex((prev) => ({ ...prev, [aptId]: null }));
-    };
 
     const selectCardImage = (aptId: string, index: number) => {
         setSelectedImageIndex((prev) => ({ ...prev, [aptId]: index }));
@@ -122,26 +109,24 @@ export default function ApartmentList({ onSelectApartment }: any) {
                 )}
 
                 {apartments.map((apt) => (
-                    <Grid item xs={12} md={6} lg={4} key={apt._id}>
-                        <Card sx={{ borderRadius: 3, overflow: 'hidden', boxShadow: 4, height: '100%', display: 'flex', flexDirection: 'column', transition: 'transform 0.2s ease, box-shadow 0.2s ease', '&:hover': { transform: 'translateY(-4px)', boxShadow: 8 } }}>
-                            <Box sx={{ position: 'relative' }}>
-                                <Box sx={{ position: 'relative', width: '100%', height: 240, overflow: 'hidden', bgcolor: 'grey.200' }}>
-                                    <Box
-                                        component="img"
-                                        src={getCardImage(apt)}
-                                        alt={apt.title}
-                                        onError={(e: React.SyntheticEvent<HTMLImageElement>) => {
-                                            e.currentTarget.src = '/placeholder-image.svg';
-                                        }}
-                                        sx={{
-                                            width: '100%',
-                                            height: '100%',
-                                            objectFit: 'cover',
-                                            objectPosition: 'center',
-                                            display: 'block'
-                                        }}
-                                    />
-                                </Box>
+                    <Grid item xs={12} md={6} lg={4} key={apt._id} sx={{ display: 'flex', justifyContent: 'center' }}>
+                        <Card sx={{ borderRadius: 3, overflow: 'hidden', boxShadow: 4, height: '100%', width: '100%', maxWidth: 360, minWidth: 360, display: 'flex', flexDirection: 'column', transition: 'transform 0.2s ease, boxShadow: 0.2s ease', '&:hover': { transform: 'translateY(-4px)', boxShadow: 8 } }}>
+                            <Box sx={{ position: 'relative', width: '100%', height: 240, overflow: 'hidden', bgcolor: 'grey.200' }}>
+                                <Box
+                                    component="img"
+                                    src={getCardImage(apt)}
+                                    alt={apt.title}
+                                    onError={(e: React.SyntheticEvent<HTMLImageElement>) => {
+                                        e.currentTarget.src = '/placeholder-image.svg';
+                                    }}
+                                    sx={{
+                                        width: '100%',
+                                        height: '100%',
+                                        objectFit: 'cover',
+                                        objectPosition: 'center',
+                                        display: 'block'
+                                    }}
+                                />
 
                                 <Box sx={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, rgba(0,0,0,0.05) 0%, rgba(0,0,0,0.55) 100%)' }} />
 
@@ -175,23 +160,20 @@ export default function ApartmentList({ onSelectApartment }: any) {
                                                     key={dotIndex}
                                                     component="button"
                                                     type="button"
-                                                    onMouseEnter={() => setCardPreview(apt._id, dotIndex)}
-                                                    onMouseLeave={() => clearCardPreview(apt._id)}
                                                     onClick={() => selectCardImage(apt._id, dotIndex)}
                                                     sx={{
-                                                        width: 10,
-                                                        height: 10,
-                                                        minWidth: 10,
+                                                        width: 12,
+                                                        height: 12,
+                                                        minWidth: 12,
                                                         borderRadius: '50%',
                                                         border: 'none',
                                                         padding: 0,
-                                                        backgroundColor: isActive ? 'primary.main' : 'rgba(255,255,255,0.65)',
+                                                        backgroundColor: isActive ? 'primary.main' : 'rgba(255,255,255,0.75)',
                                                         boxShadow: isActive ? '0 0 0 4px rgba(25, 118, 210, 0.18)' : 'none',
                                                         cursor: 'pointer',
-                                                        transition: 'transform 0.2s ease, background-color 0.2s ease',
+                                                        transition: 'transform 0.15s ease, background-color 0.15s ease',
                                                         '&:hover': {
-                                                            transform: 'scale(1.2)',
-                                                            backgroundColor: 'primary.main'
+                                                            transform: 'scale(1.15)'
                                                         }
                                                     }}
                                                 />
