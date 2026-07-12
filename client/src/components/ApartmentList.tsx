@@ -14,29 +14,79 @@ interface Apartment {
     rooms?: number;
     pricePerNight?: number;
     images?: string[];
+    mainImage?: string;
 }
 
 export default function ApartmentList({ onSelectApartment }: any) {
     const getImageUrl = (url?: string) => {
-        if (!url) return '/placeholder-image.svg';
-        const normalized = url.replace(/\\/g, '/');
-        if (/^https?:\/\//i.test(normalized)) return normalized;
-        const base = api.defaults.baseURL.replace(/\/api$/, '');
-        if (normalized.startsWith('/uploads')) {
-            return `${base}${normalized}`;
+        try {
+            if (!url) return '/placeholder-image.svg';
+            const normalized = url.replace(/\\/g, '/');
+            if (/^https?:\/\//i.test(normalized)) return normalized;
+            const base = (api.defaults && api.defaults.baseURL) ? api.defaults.baseURL.replace(/\/api$/, '') : '';
+            if (normalized.startsWith('/uploads')) {
+                const full = `${base}${normalized}`;
+                console.debug('getImageUrl -> uploads (leading slash):', full);
+                return full;
+            }
+            if (normalized.startsWith('uploads/')) {
+                const full = `${base}/${normalized}`;
+                console.debug('getImageUrl -> uploads (no leading slash):', full);
+                return full;
+            }
+            if (normalized.includes('/uploads/')) {
+                const full = `${base}${normalized.startsWith('/') ? '' : '/'}${normalized}`;
+                console.debug('getImageUrl -> contains /uploads/:', full);
+                return full;
+            }
+            const defaultFull = `${base}/${normalized}`.replace(/([^:]\/)\/+/g, '$1');
+            console.debug('getImageUrl -> returning base relative:', defaultFull);
+            return defaultFull;
+        } catch (e) {
+            console.error('getImageUrl error', e, url);
+            return '/placeholder-image.svg';
         }
-        if (normalized.startsWith('uploads/')) {
-            return `${base}/${normalized}`;
-        }
-        if (normalized.includes('/uploads/')) {
-            return `${base}${normalized.startsWith('/') ? '' : '/'}${normalized}`;
-        }
-        return normalized;
     };
 
     const [apartments, setApartments] = useState<Apartment[]>([]);
     const [city, setCity] = useState('');
     const [minBeds, setMinBeds] = useState<number | ''>('');
+    const [selectedImageIndex, setSelectedImageIndex] = useState<Record<string, number>>({});
+    const [previewImageIndex, setPreviewImageIndex] = useState<Record<string, number | null>>({});
+
+    const getCardImages = (apt: Apartment) => {
+        if (Array.isArray(apt.images) && apt.images.length > 0) {
+            return apt.images.map(getImageUrl);
+        }
+        return [getImageUrl(apt.mainImage || undefined)];
+    };
+
+    const getCardDisplayIndex = (apt: Apartment) => {
+        const preview = previewImageIndex[apt._id];
+        if (typeof preview === 'number') return preview;
+        return selectedImageIndex[apt._id] ?? 0;
+    };
+
+    const getCardImage = (apt: Apartment) => {
+        const images = getCardImages(apt);
+        const index = getCardDisplayIndex(apt);
+        return images[index] || images[0] || '/placeholder-image.svg';
+    };
+
+    const imageCount = (apt: Apartment) => getCardImages(apt).length;
+
+    const setCardPreview = (aptId: string, index: number) => {
+        setPreviewImageIndex((prev) => ({ ...prev, [aptId]: index }));
+    };
+
+    const clearCardPreview = (aptId: string) => {
+        setPreviewImageIndex((prev) => ({ ...prev, [aptId]: null }));
+    };
+
+    const selectCardImage = (aptId: string, index: number) => {
+        setSelectedImageIndex((prev) => ({ ...prev, [aptId]: index }));
+    };
+
 
     useEffect(() => {
         fetchApartments();
@@ -73,24 +123,25 @@ export default function ApartmentList({ onSelectApartment }: any) {
 
                 {apartments.map((apt) => (
                     <Grid item xs={12} md={6} lg={4} key={apt._id}>
-                        <Card sx={{ borderRadius: 3, overflow: 'hidden', boxShadow: 4, height: '100%', transition: 'transform 0.2s ease, box-shadow 0.2s ease', '&:hover': { transform: 'translateY(-4px)', boxShadow: 8 } }}>
+                        <Card sx={{ borderRadius: 3, overflow: 'hidden', boxShadow: 4, height: '100%', display: 'flex', flexDirection: 'column', transition: 'transform 0.2s ease, box-shadow 0.2s ease', '&:hover': { transform: 'translateY(-4px)', boxShadow: 8 } }}>
                             <Box sx={{ position: 'relative' }}>
-                                <Box
-                                    component="img"
-                                    src={getImageUrl((apt.images && apt.images[0]) || apt.mainImage || undefined)}
-                                    alt={apt.title}
-                                    onError={(e: React.SyntheticEvent<HTMLImageElement>) => {
-                                        e.currentTarget.src = '/placeholder-image.svg';
-                                    }}
-                                    sx={{
-                                        width: '100%',
-                                        height: { xs: 220, md: 240 },
-                                        objectFit: 'cover',
-                                        display: 'block',
-                                        transition: 'transform 0.25s ease',
-                                        '&:hover': { transform: 'scale(1.03)' }
-                                    }}
-                                />
+                                <Box sx={{ position: 'relative', width: '100%', height: 240, overflow: 'hidden', bgcolor: 'grey.200' }}>
+                                    <Box
+                                        component="img"
+                                        src={getCardImage(apt)}
+                                        alt={apt.title}
+                                        onError={(e: React.SyntheticEvent<HTMLImageElement>) => {
+                                            e.currentTarget.src = '/placeholder-image.svg';
+                                        }}
+                                        sx={{
+                                            width: '100%',
+                                            height: '100%',
+                                            objectFit: 'cover',
+                                            objectPosition: 'center',
+                                            display: 'block'
+                                        }}
+                                    />
+                                </Box>
 
                                 <Box sx={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, rgba(0,0,0,0.05) 0%, rgba(0,0,0,0.55) 100%)' }} />
 
@@ -103,6 +154,51 @@ export default function ApartmentList({ onSelectApartment }: any) {
                                         {apt.title}
                                     </Typography>
                                 </Box>
+
+                                {imageCount(apt) > 1 && (
+                                    <Box
+                                        sx={{
+                                            position: 'absolute',
+                                            bottom: 12,
+                                            left: 12,
+                                            right: 12,
+                                            display: 'flex',
+                                            justifyContent: 'center',
+                                            gap: 1,
+                                        }}
+                                    >
+                                        {getCardImages(apt).map((_, dotIndex) => {
+                                            const currentIndex = getCardDisplayIndex(apt);
+                                            const isActive = currentIndex === dotIndex;
+                                            return (
+                                                <Box
+                                                    key={dotIndex}
+                                                    component="button"
+                                                    type="button"
+                                                    onMouseEnter={() => setCardPreview(apt._id, dotIndex)}
+                                                    onMouseLeave={() => clearCardPreview(apt._id)}
+                                                    onClick={() => selectCardImage(apt._id, dotIndex)}
+                                                    sx={{
+                                                        width: 10,
+                                                        height: 10,
+                                                        minWidth: 10,
+                                                        borderRadius: '50%',
+                                                        border: 'none',
+                                                        padding: 0,
+                                                        backgroundColor: isActive ? 'primary.main' : 'rgba(255,255,255,0.65)',
+                                                        boxShadow: isActive ? '0 0 0 4px rgba(25, 118, 210, 0.18)' : 'none',
+                                                        cursor: 'pointer',
+                                                        transition: 'transform 0.2s ease, background-color 0.2s ease',
+                                                        '&:hover': {
+                                                            transform: 'scale(1.2)',
+                                                            backgroundColor: 'primary.main'
+                                                        }
+                                                    }}
+                                                />
+                                            );
+                                        })}
+                                    </Box>
+                                )}
                             </Box>
 
                             <CardContent>

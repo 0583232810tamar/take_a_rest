@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Container, AppBar, Toolbar, Typography, Button, Box, Divider, Avatar, Stack, Chip } from '@mui/material';
+import { Container, AppBar, Toolbar, Typography, Button, Box, Divider, Avatar, Chip } from '@mui/material';
 import Auth from './components/Auth';
 import AddApartment from './components/AddApartment';
 import ApartmentList from './components/ApartmentList';
@@ -16,12 +16,108 @@ function App() {
   useEffect(() => {
     const savedUser = localStorage.getItem('user');
     if (savedUser) setUser(JSON.parse(savedUser));
+
+    const savedApartment = localStorage.getItem('selectedApartment');
+    if (savedApartment) {
+      try {
+        setSelectedApartment(JSON.parse(savedApartment));
+      } catch {
+        localStorage.removeItem('selectedApartment');
+      }
+    }
   }, []);
 
   const handleLogout = () => {
     localStorage.clear();
     setUser(null);
+    setSelectedApartment(null);
     setView('home');
+  };
+
+  const handleSelectApartment = (apt: any) => {
+    setSelectedApartment(apt);
+    localStorage.setItem('selectedApartment', JSON.stringify(apt));
+  };
+
+  const handleBackFromDetails = () => {
+    setSelectedApartment(null);
+    localStorage.removeItem('selectedApartment');
+  };
+
+  const renderContent = () => {
+    if (!user) {
+      return <Auth onLoginSuccess={(u) => setUser(u)} />;
+    }
+
+    if (view === 'admin') {
+      return <AdminDashboard onBack={() => setView('home')} />;
+    }
+
+    if (view === 'myApartments') {
+      return <MyApartments onBack={() => setView('home')} onEdit={(apt) => handleSelectApartment(apt)} />;
+    }
+
+    if (selectedApartment) {
+      return <ApartmentDetails apartment={selectedApartment} user={user} onBack={handleBackFromDetails} />;
+    }
+
+    return (
+      <Box>
+        {/* Greeting */}
+        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 3 }}>
+          <Box sx={{ display: 'flex', flexDirection: 'row', gap: 2, alignItems: 'center' }}>
+            <Avatar sx={{ bgcolor: 'primary.main', width: 56, height: 56, fontWeight: 900 }}>
+              {((user?.name || user?.profile?.name || user?.email || '')
+                .split(' ')
+                .map((n: string) => n[0])
+                .slice(0, 2)
+                .join('')
+              ).toUpperCase()}
+            </Avatar>
+            <Box>
+              <Typography variant="h6" sx={{ fontWeight: 800, lineHeight: 1 }}>
+                שלום, {user?.name || user?.profile?.name || 'משתמש'}
+              </Typography>
+              <Typography variant="body2" color="text.secondary" sx={{ mt: 0.3 }}>
+                {user?.email}
+              </Typography>
+            </Box>
+            {user?.role === 'admin' && <Chip label="מנהל" color="warning" sx={{ mr: 1 }} />}
+          </Box>
+
+          <Button
+            onClick={() => setShowAdd((prev) => !prev)}
+            variant="contained"
+            size="large"
+            color="secondary"
+            sx={{
+              px: 3,
+              py: 1.5,
+              fontWeight: '900',
+              borderRadius: '14px',
+              boxShadow: '0 6px 18px rgba(25,118,210,0.25)',
+              animation: 'float 2.2s ease-in-out infinite',
+              '@keyframes float': {
+                '0%': { transform: 'translateY(0)' },
+                '50%': { transform: 'translateY(-6px)' },
+                '100%': { transform: 'translateY(0)' },
+              },
+            }}
+          >
+            ➕ הוספת דירה למאגר
+          </Button>
+        </Box>
+
+        {showAdd && (
+          <Box sx={{ mb: 4 }}>
+            <AddApartment user={user} onSuccess={() => { alert('נשלח לאישור!'); setShowAdd(false); }} />
+          </Box>
+        )}
+
+        <Divider sx={{ my: 4 }} />
+        <ApartmentList onSelectApartment={handleSelectApartment} />
+      </Box>
+    );
   };
 
   return (
@@ -31,7 +127,7 @@ function App() {
           <Typography variant="h6" sx={{ cursor: 'pointer' }} onClick={() => setView('home')}>
             🏢 מערכת לניהול דירות
           </Typography>
-          
+
           {user && (
             <Box sx={{ display: 'flex', gap: 2 }}>
               {user.role === 'admin' && <Button color="inherit" onClick={() => setView('admin')}>לוח ניהול</Button>}
@@ -43,69 +139,7 @@ function App() {
       </AppBar>
 
       <Container maxWidth="lg" sx={{ mt: 4 }}>
-        {!user ? <Auth onLoginSuccess={(u) => setUser(u)} /> : 
-         view === 'admin' ? <AdminDashboard onBack={() => setView('home')} /> :
-         view === 'myApartments' ? <MyApartments onBack={() => setView('home')} onEdit={(apt) => { setSelectedApartment(apt); setView('home'); }} /> :
-         selectedApartment ? <ApartmentDetails apartment={selectedApartment} user={user} onBack={() => setSelectedApartment(null)} /> :
-         <Box>
-          {/* Greeting */}
-          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 3 }}>
-            <Stack direction="row" spacing={2} alignItems="center">
-              <Avatar sx={{ bgcolor: 'primary.main', width: 56, height: 56, fontWeight: 900 }}>
-                {((user?.name || user?.profile?.name || user?.email || '')
-                  .split(' ')
-                  .map((n: string) => n[0])
-                  .slice(0,2)
-                  .join('')
-                ).toUpperCase()}
-              </Avatar>
-              <Box>
-                <Typography variant="h6" sx={{ fontWeight: 800, lineHeight: 1 }}>
-                  שלום, {user?.name || user?.profile?.name || 'משתמש'}
-                </Typography>
-                <Typography variant="body2" color="text.secondary" sx={{ mt: 0.3 }}>
-                  {user?.email}
-                </Typography>
-              </Box>
-              {user?.role === 'admin' && <Chip label="מנהל" color="warning" sx={{ mr: 1 }} />}
-            </Stack>
-
-            {/* Animated prominent Add button */}
-              <Button
-                onClick={() => setShowAdd(prev => !prev)}
-                variant="contained"
-                size="large"
-                color="secondary"
-                sx={{
-                  px: 3,
-                  py: 1.5,
-                  fontWeight: '900',
-                  borderRadius: '14px',
-                  boxShadow: '0 6px 18px rgba(25,118,210,0.25)',
-                  animation: 'float 2.2s ease-in-out infinite',
-                  '@keyframes float': {
-                    '0%': { transform: 'translateY(0)' },
-                    '50%': { transform: 'translateY(-6px)' },
-                    '100%': { transform: 'translateY(0)' }
-                  }
-                }}
-              >
-                ➕ הוספת דירה למאגר
-              </Button>
-          </Box>
-
-          {showAdd && (
-            <Box sx={{ mb: 4 }}>
-              <AddApartment user={user} onSuccess={() => { alert('נשלח לאישור!'); setShowAdd(false); }} />
-            </Box>
-          )}
-
-          {/* Floating add button removed (keep only header button) */}
-
-          <Divider sx={{ my: 4 }} />
-          <ApartmentList onSelectApartment={setSelectedApartment} />
-         </Box>
-        }
+        {renderContent()}
       </Container>
     </Box>
   );

@@ -40,20 +40,33 @@ export default function ApartmentDetails({ apartment, user, onBack }: ApartmentD
 	if (!apartment) return null;
 
 	const getImageUrl = (url: string | undefined) => {
-		if (!url) return '';
-		const normalized = url.replace(/\\/g, '/');
-		if (/^https?:\/\//i.test(normalized)) return normalized;
-		const base = api.defaults.baseURL.replace(/\/api$/, '');
-		if (normalized.startsWith('/uploads')) {
-			return `${base}${normalized}`;
+		try {
+			if (!url) return '/placeholder-image.svg';
+			const normalized = url.replace(/\\/g, '/');
+			if (/^https?:\/\//i.test(normalized)) return normalized;
+			const base = (api.defaults && api.defaults.baseURL) ? api.defaults.baseURL.replace(/\/api$/, '') : '';
+			if (normalized.startsWith('/uploads')) {
+				const full = `${base}${normalized}`;
+				console.debug('getImageUrl(details) -> uploads (leading slash):', full);
+				return full;
+			}
+			if (normalized.startsWith('uploads/')) {
+				const full = `${base}/${normalized}`;
+				console.debug('getImageUrl(details) -> uploads (no leading slash):', full);
+				return full;
+			}
+			if (normalized.includes('/uploads/')) {
+				const full = `${base}${normalized.startsWith('/') ? '' : '/'}${normalized}`;
+				console.debug('getImageUrl(details) -> contains /uploads/:', full);
+				return full;
+			}
+			const defaultFull = `${base}/${normalized}`.replace(/([^:]\/)\/+/g, '$1');
+			console.debug('getImageUrl(details) -> default full:', defaultFull);
+			return defaultFull;
+		} catch (e) {
+			console.error('getImageUrl(details) error', e, url);
+			return '/placeholder-image.svg';
 		}
-		if (normalized.startsWith('uploads/')) {
-			return `${base}/${normalized}`;
-		}
-		if (normalized.includes('/uploads/')) {
-			return `${base}${normalized.startsWith('/') ? '' : '/'}${normalized}`;
-		}
-		return `${base}/${normalized}`;
 	};
 
 	const rawImages = Array.isArray(apartment.images)

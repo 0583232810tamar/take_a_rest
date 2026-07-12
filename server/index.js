@@ -3,6 +3,7 @@ import http from 'http';
 import { Server } from 'socket.io';
 import mongoose from 'mongoose';
 import cors from 'cors';
+import fs from 'fs';
 import dotenv from 'dotenv';
 import helmet from 'helmet';
 import xss from 'xss-clean';
@@ -30,7 +31,11 @@ app.set('trust proxy', true);
 // --- 🛡️ שכבות הגנה ואבטחה ממתקפות (Security Middlewares) ---
 
 // 1. Helmet - הגנה על כותרי ה-HTTP (Headers) ומניעת חשיפת מידע טכנולוגי על השרת
-app.use(helmet());
+app.use(
+    helmet({
+        crossOriginResourcePolicy: false,
+    })
+);
 
 // 2. XSS Clean - הגנה מפני הזרקות קוד זדוני (Cross-Site Scripting) בתוך ה-Body או ה-Query
 app.use(xss());
@@ -68,8 +73,28 @@ app.use(cors());
 app.use(express.json({ limit: '10kb' })); // הגבלת גודל ה-Body ל-10 קילובייט למניעת קריסת זיכרון השרת
 app.use(express.urlencoded({ extended: true, limit: '10kb' }));
 
+// ניטור בקשות סטטיות ל-/uploads לצורך דיבאג טעינת תמונות
+app.use((req, res, next) => {
+    if (req.path && req.path.startsWith('/uploads')) {
+        try {
+            const fileOnDisk = path.join(process.cwd(), req.path);
+            const exists = fs.existsSync(fileOnDisk);
+            console.log(`[static-check] ${req.method} ${req.path} -> exists: ${exists}`);
+            if (!exists) console.warn(`[static-missing] requested file not found on disk: ${fileOnDisk}`);
+        } catch (e) {
+            console.error('static-check error', e.message);
+        }
+    }
+    next();
+});
+
 // חשיפה של קבצים סטטיים מ-uploads
-app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
+app.use('/uploads', express.static(path.join(process.cwd(), 'uploads'), {
+    setHeaders: (res) => {
+        res.setHeader('Access-Control-Allow-Origin', '*');
+        res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+    }
+}));
 
 // מחזיר שגיאות תמיד בפורמט JSON במקום HTML כדי שהלקוח יוכל לפרש אותן
 app.use((err, req, res, next) => {
