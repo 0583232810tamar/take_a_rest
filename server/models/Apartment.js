@@ -45,7 +45,13 @@ const apartmentSchema = new mongoose.Schema({
     mainImage: { type: String },
     images: [{ type: String }],
 
-    bookedDates: [{ type: String }],
+    // לוח זמנים: תאריכים תפוסים
+    bookedDates: [{ 
+        date: { type: String }, // YYYY-MM-DD
+        status: { type: String, enum: ['booked', 'blocked', 'pending'], default: 'booked' }, // booked = הוזמן, blocked = סגור בעלים, pending = עומד להסגר (?)
+        bookingId: { type: mongoose.Schema.Types.ObjectId, ref: 'Booking' }
+    }],
+    
     pricePerNight: { type: Number, default: 0 },
     priceWeekend: { type: Number, default: 0 },
     minNights: { type: Number, default: 1 },

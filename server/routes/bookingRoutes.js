@@ -40,7 +40,8 @@ router.post('/', protect, async (req, res) => {
         }
 
         // בדיקה האם אחד מהתאריכים המבוקשים כבר תפוס בנכס
-        const isAlreadyBooked = dates.some(date => apartment.bookedDates.includes(date));
+        const existingDates = apartment.bookedDates?.map(bd => typeof bd === 'string' ? bd : bd.date) || [];
+        const isAlreadyBooked = dates.some(date => existingDates.includes(date));
         if (isAlreadyBooked) {
             await session.abortTransaction();
             session.endSession();
@@ -56,8 +57,13 @@ router.post('/', protect, async (req, res) => {
         });
         await newBooking.save({ session });
 
-        // דחיפת התאריכים החדשים למערך הכללי של הדירה ושמירה
-        apartment.bookedDates.push(...dates);
+        // דחיפת התאריכים החדשים למערך הכללי של הדירה עם status 'booked'
+        const bookedEntries = dates.map(date => ({
+            date,
+            status: 'booked',
+            bookingId: newBooking._id
+        }));
+        apartment.bookedDates = (apartment.bookedDates || []).concat(bookedEntries);
         await apartment.save({ session });
 
         await session.commitTransaction();
@@ -99,7 +105,10 @@ router.delete('/:id', protect, async (req, res) => {
         }
 
         // הסרת התאריכים המבוטלים ממערך הדירה
-        apartment.bookedDates = apartment.bookedDates.filter(date => !booking.dates.includes(date));
+        apartment.bookedDates = (apartment.bookedDates || []).filter(bd => {
+            const bdDate = typeof bd === 'string' ? bd : bd.date;
+            return !booking.dates.includes(bdDate);
+        });
         await apartment.save({ session });
 
         await Booking.findByIdAndDelete(req.params.id).session(session);

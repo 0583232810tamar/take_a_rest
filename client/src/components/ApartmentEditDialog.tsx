@@ -8,19 +8,6 @@ export default function ApartmentEditDialog({ open, onClose, apartment, onSaved 
 
     useEffect(()=>{ setInitialData(apartment || null); }, [apartment]);
 
-    // when used as edit, we will render the full AddApartment form in edit mode
-    // AddApartment will expose a `submitWithFormData` callback via prop for saving
-    const handleSubmit = async (formData: FormData) => {
-        try {
-            await api.put(`/apartments/${apartment._id}`, formData, { headers: { 'Content-Type': 'multipart/form-data' } });
-            onSaved && onSaved();
-            onClose();
-        } catch (err) {
-            console.error('שגיאה בשמירת דירה בעריכה:', err.response?.data || err.message);
-            throw err;
-        }
-    };
-
     if (!initialData || !apartment) return null;
 
     // Provide the editingApartment via the `user` prop to make AddApartment enter edit mode

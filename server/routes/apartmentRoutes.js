@@ -6,26 +6,47 @@ import { CloudinaryStorage } from 'multer-storage-cloudinary';
 import Apartment from '../models/Apartment.js';
 import { protect, adminOnly } from '../middleware/authMiddleware.js';
 import mongoose from 'mongoose';
+import path from 'path';
+import fs from 'fs';
 
 const router = express.Router();
 
-// 1. קונפיגורציית חיבור ל-Cloudinary
-cloudinary.config({
-    cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-    api_key: process.env.CLOUDINARY_API_KEY,
-    api_secret: process.env.CLOUDINARY_API_SECRET
-});
+const localUploadFolder = path.join(process.cwd(), 'uploads', 'apartments');
+const useCloudinary = Boolean(process.env.CLOUDINARY_CLOUD_NAME && process.env.CLOUDINARY_API_KEY && process.env.CLOUDINARY_API_SECRET);
 
-// 2. הגדרת מאחסן Multer ישירות לענן כולל כיווץ ואופטימיזציה אוטומטית של התמונות
-const storage = new CloudinaryStorage({
-    cloudinary: cloudinary,
-    params: {
-        folder: 'vacation_apartments', // שם התיקייה בענן שלך
-        allowed_formats: ['jpg', 'png', 'jpeg', 'webp'],
-        transformation: [{ width: 1200, height: 800, crop: 'limit', quality: 'auto' }] // כיווץ אוטומטי לגודל אופטימלי לדיבוב
+let upload;
+if (useCloudinary) {
+    cloudinary.config({
+        cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+        api_key: process.env.CLOUDINARY_API_KEY,
+        api_secret: process.env.CLOUDINARY_API_SECRET
+    });
+
+    const storage = new CloudinaryStorage({
+        cloudinary: cloudinary,
+        params: {
+            folder: 'vacation_apartments', // שם התיקייה בענן שלך
+            allowed_formats: ['jpg', 'png', 'jpeg', 'webp'],
+            transformation: [{ width: 1200, height: 800, crop: 'limit', quality: 'auto' }] // כיווץ אוטומטי לגודל אופטימלי לדיבוב
+        }
+    });
+    upload = multer({ storage });
+    console.log('🌥️ משתמש ב-Cloudinary להעלאת תמונות');
+} else {
+    if (!fs.existsSync(localUploadFolder)) {
+        fs.mkdirSync(localUploadFolder, { recursive: true });
     }
-});
-const upload = multer({ storage });
+    const localStorage = multer.diskStorage({
+        destination: localUploadFolder,
+        filename: (req, file, cb) => {
+            const ext = path.extname(file.originalname);
+            const fileName = `${Date.now()}-${Math.round(Math.random() * 1e9)}${ext}`;
+            cb(null, fileName);
+        }
+    });
+    upload = multer({ storage: localStorage });
+    console.log('📁 משתמש בהעלאה מקומית ל-uploads/apartments');
+}
 
 // הגדרת Nodemailer לשליחת מיילים - השתמש ב-SMTP אמיתי אם קיים, אחרת צור חשבון Ethereal לבדיקה
 const ADMIN_EMAIL = process.env.ADMIN_EMAIL || 'tamar@example.com';
@@ -70,21 +91,36 @@ const getDatesInRange = (startDateStr, endDateStr) => {
     return dates;
 };
 
+const parseJsonField = (value) => {
+    if (typeof value !== 'string') return value;
+    try {
+        return JSON.parse(value);
+    } catch (err) {
+        return value;
+    }
+};
+
 // [CREATE] - יצירת דירה חדשה עם העלאת תמונות מרובות לענן (מוגן למשתמשים מחוברים)
 router.post('/', protect, upload.array('images', 10), async (req, res) => {
     try {
         let apartmentData = { ...req.body };
 
-        // פרסור אובייקטים מורכבים במידה והגיעו כ-FormData מהפרונטאנד
-        if (typeof apartmentData.shabbatEquipment === 'string') apartmentData.shabbatEquipment = JSON.parse(apartmentData.shabbatEquipment);
-        if (typeof apartmentData.swapPreferences === 'string') apartmentData.swapPreferences = JSON.parse(apartmentData.swapPreferences);
-        if (typeof apartmentData.rules === 'string') apartmentData.rules = JSON.parse(apartmentData.rules);
-        if (typeof apartmentData.yardDetails === 'string') apartmentData.yardDetails = JSON.parse(apartmentData.yardDetails);
-        if (typeof apartmentData.appliances === 'string') apartmentData.appliances = JSON.parse(apartmentData.appliances);
+        // פרסור אובייקטים ומערכים מורכבים שנשלחו כ-JSON בתוך FormData
+        apartmentData.shabbatEquipment = parseJsonField(apartmentData.shabbatEquipment);
+        apartmentData.swapPreferences = parseJsonField(apartmentData.swapPreferences);
+        apartmentData.rules = parseJsonField(apartmentData.rules);
+        apartmentData.yardDetails = parseJsonField(apartmentData.yardDetails);
+        apartmentData.appliances = parseJsonField(apartmentData.appliances);
+        apartmentData.bookedDates = parseJsonField(apartmentData.bookedDates);
 
-        // שמירת הקישורים הרשמיים מ-Cloudinary
+        // שמירת הקישורים הרשמיים מ-Cloudinary או קבצים מקומיים
         if (req.files && req.files.length > 0) {
-            const fileUrls = req.files.map(file => file.path); // Cloudinary מחזיר את הקישור המלא ב-path
+            const fileUrls = req.files.map(file => {
+                if (useCloudinary) {
+                    return file.path; // Cloudinary מחזיר את הקישור המלא ב-path
+                }
+                return `/uploads/apartments/${path.basename(file.path)}`;
+            });
             apartmentData.images = fileUrls;
             apartmentData.mainImage = fileUrls[0];
         }
@@ -410,15 +446,21 @@ router.put('/:id', protect, upload.array('images', 10), async (req, res) => {
         let updateData = { ...req.body };
 
         // פרסור אובייקטים מורכבים במידה ועודכנו
-        if (typeof updateData.shabbatEquipment === 'string') updateData.shabbatEquipment = JSON.parse(updateData.shabbatEquipment);
-        if (typeof updateData.swapPreferences === 'string') updateData.swapPreferences = JSON.parse(updateData.swapPreferences);
-        if (typeof updateData.rules === 'string') updateData.rules = JSON.parse(updateData.rules);
-        if (typeof updateData.yardDetails === 'string') updateData.yardDetails = JSON.parse(updateData.yardDetails);
-        if (typeof updateData.appliances === 'string') updateData.appliances = JSON.parse(updateData.appliances);
+        updateData.shabbatEquipment = parseJsonField(updateData.shabbatEquipment);
+        updateData.swapPreferences = parseJsonField(updateData.swapPreferences);
+        updateData.rules = parseJsonField(updateData.rules);
+        updateData.yardDetails = parseJsonField(updateData.yardDetails);
+        updateData.appliances = parseJsonField(updateData.appliances);
+        updateData.bookedDates = parseJsonField(updateData.bookedDates);
 
         // אם הועלו תמונות חדשות, נצרף אותן או נחליף
         if (req.files && req.files.length > 0) {
-            const fileUrls = req.files.map(file => file.path);
+            const fileUrls = req.files.map(file => {
+                if (useCloudinary) {
+                    return file.path;
+                }
+                return `/uploads/apartments/${path.basename(file.path)}`;
+            });
             updateData.images = fileUrls;
             updateData.mainImage = fileUrls[0];
         }
@@ -456,4 +498,47 @@ router.delete('/:id', protect, async (req, res) => {
         res.status(500).json({ message: 'שגיאה במחיקת הדירה', error: error.message });
     }
 });
+
+// [UPDATE BOOKED DATES] - עדכון תאריכים תפוסים בלוח השנה
+// status: 'booked' = הוזמן, 'blocked' = סגור על ידי בעלים, 'pending' = עומד להסגר (?)
+router.put('/:id/dates', protect, async (req, res) => {
+    try {
+        const { dates } = req.body; // Array of { date: 'YYYY-MM-DD', status: 'booked|blocked|pending' }
+        
+        const apartment = await Apartment.findById(req.params.id);
+        if (!apartment) return res.status(404).json({ message: 'הדירה לא נמצאה' });
+
+        // אישור רק בעל הדירה או אדמין
+        if (apartment.owner.toString() !== req.user.id && req.user.role !== 'admin') {
+            return res.status(403).json({ message: 'אין לך הרשאה לעדכן תאריכים לדירה זו' });
+        }
+
+        // עדכון תאריכים
+        apartment.bookedDates = dates || [];
+        const updated = await apartment.save();
+
+        res.json({ message: 'תאריכים עודכנו בהצלחה', bookedDates: updated.bookedDates });
+    } catch (error) {
+        res.status(500).json({ message: 'שגיאה בעדכון תאריכים', error: error.message });
+    }
+});
+
+// [GET CALENDAR] - הבאת לוח שנה של דירה מסוימת
+router.get('/:id/calendar', async (req, res) => {
+    try {
+        const apartment = await Apartment.findById(req.params.id).select('bookedDates title pricePerNight priceWeekend');
+        if (!apartment) return res.status(404).json({ message: 'הדירה לא נמצאה' });
+
+        res.json({
+            apartmentId: apartment._id,
+            title: apartment.title,
+            pricePerNight: apartment.pricePerNight,
+            priceWeekend: apartment.priceWeekend,
+            bookedDates: apartment.bookedDates || []
+        });
+    } catch (error) {
+        res.status(500).json({ message: 'שגיאה בהבאת לוח השנה', error: error.message });
+    }
+});
+
 export default router;

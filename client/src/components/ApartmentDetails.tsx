@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import api from '../api';
 import { Container, Box, Button, Typography, Paper, Grid, IconButton, Tabs, Tab, Divider, Stack, Fade } from '@mui/material';
 import InfoOutlined from '@mui/icons-material/InfoOutlined';
 import HomeOutlined from '@mui/icons-material/HomeOutlined';
@@ -17,6 +18,7 @@ import SmokeFree from '@mui/icons-material/SmokeFree';
 import Schedule from '@mui/icons-material/Schedule';
 import Phone from '@mui/icons-material/Phone';
 import AttachMoney from '@mui/icons-material/AttachMoney';
+import CalendarPicker from './CalendarPicker';
 
 interface ApartmentDetailsProps {
 	apartment: any;
@@ -37,8 +39,32 @@ function TabPanel({ children, value, index }: { children?: React.ReactNode; valu
 export default function ApartmentDetails({ apartment, user, onBack }: ApartmentDetailsProps) {
 	if (!apartment) return null;
 
-	const images: string[] = (apartment.images && apartment.images.length > 0) ? apartment.images : (apartment.imageUrl ? [apartment.imageUrl] : []);
+	const getImageUrl = (url: string | undefined) => {
+		if (!url) return '';
+		const normalized = url.replace(/\\/g, '/');
+		if (/^https?:\/\//i.test(normalized)) return normalized;
+		const base = api.defaults.baseURL.replace(/\/api$/, '');
+		if (normalized.startsWith('/uploads')) {
+			return `${base}${normalized}`;
+		}
+		if (normalized.startsWith('uploads/')) {
+			return `${base}/${normalized}`;
+		}
+		if (normalized.includes('/uploads/')) {
+			return `${base}${normalized.startsWith('/') ? '' : '/'}${normalized}`;
+		}
+		return `${base}/${normalized}`;
+	};
+
+	const rawImages = Array.isArray(apartment.images)
+		? apartment.images
+		: (typeof apartment.images === 'string' ? [apartment.images] : []);
+	const images: string[] = rawImages.length > 0
+		? rawImages
+		: (apartment.mainImage ? [apartment.mainImage] : (apartment.imageUrl ? [apartment.imageUrl] : []));
+	const parsedImages = images.map(getImageUrl).filter(Boolean) as string[];
 	const [idx, setIdx] = useState(0);
+	const heroImage = parsedImages[idx] || '/placeholder-image.svg';
 	const [tab, setTab] = useState(0);
 
 	const sectionSx = { p: 3, borderRadius: 2, boxShadow: 1, mb: 3, bgcolor: 'background.paper' };
@@ -57,8 +83,8 @@ export default function ApartmentDetails({ apartment, user, onBack }: ApartmentD
 		</Box>
 	);
 
-	const next = () => setIdx(i => (i + 1) % Math.max(1, images.length));
-	const prev = () => setIdx(i => (i - 1 + Math.max(1, images.length)) % Math.max(1, images.length));
+	const next = () => setIdx(i => (i + 1) % Math.max(1, parsedImages.length));
+	const prev = () => setIdx(i => (i - 1 + Math.max(1, parsedImages.length)) % Math.max(1, parsedImages.length));
 
 	// keyboard shortcuts for carousel
 	useEffect(() => {
@@ -68,7 +94,13 @@ export default function ApartmentDetails({ apartment, user, onBack }: ApartmentD
 		};
 		window.addEventListener('keydown', handler);
 		return () => window.removeEventListener('keydown', handler);
-	}, [images.length]);
+	}, [parsedImages.length]);
+
+	useEffect(() => {
+		if (idx >= parsedImages.length) {
+			setIdx(0);
+		}
+	}, [parsedImages.length, idx]);
 
 	return (
 		<Container maxWidth="lg" sx={{ mt: 4, direction: 'rtl' }}>
@@ -76,22 +108,31 @@ export default function ApartmentDetails({ apartment, user, onBack }: ApartmentD
 
 			<Grid container spacing={3}>
 				<Grid item xs={12} md={8}>
-					<Paper sx={{ p: 0, borderRadius: 2, overflow: 'hidden', minHeight: { xs: 'auto', md: 'calc(100vh - 160px)' } }}>
+					<Paper sx={{ p: 0, borderRadius: 2, overflow: 'hidden', minHeight: { xs: 'auto', md: 'calc(100vh - 160px)' }, boxShadow: '0 16px 40px rgba(15, 23, 42, 0.12)' }}>
 						{/* Large carousel */}
 						<Box sx={{ position: 'relative', width: '100%', bgcolor: 'grey.100' }}>
-							<Box component="img" src={images[idx] || 'https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?w=1200'} alt={`תמונה ${idx + 1}`} sx={{ width: '100%', height: { xs: 300, md: 480 }, objectFit: 'cover', display: 'block' }} />
+							<Box
+								component="img"
+								src={heroImage}
+								alt={`תמונה ${idx + 1}`}
+								onError={(e: React.SyntheticEvent<HTMLImageElement>) => {
+									e.currentTarget.src = '/placeholder-image.svg';
+								}}
+								sx={{ width: '100%', height: { xs: 320, md: 520 }, objectFit: 'cover', display: 'block', objectPosition: 'center' }}
+							/>
 
-							<IconButton onClick={prev} size="small" sx={{ position: 'absolute', left: 8, top: '50%', transform: 'translateY(-50%)', bgcolor: 'rgba(0,0,0,0.4)', color: 'white', '&:hover': { bgcolor: 'rgba(0,0,0,0.6)' } }}>
+							<Box sx={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, rgba(0,0,0,0.06) 0%, rgba(0,0,0,0.35) 100%)' }} />
+							<IconButton onClick={prev} size="small" sx={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', bgcolor: 'rgba(0,0,0,0.45)', color: 'white', backdropFilter: 'blur(6px)', '&:hover': { bgcolor: 'rgba(0,0,0,0.7)' } }}>
 								<ArrowBackIosNew fontSize="small" />
 							</IconButton>
-							<IconButton onClick={next} size="small" sx={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', bgcolor: 'rgba(0,0,0,0.4)', color: 'white', '&:hover': { bgcolor: 'rgba(0,0,0,0.6)' } }}>
+							<IconButton onClick={next} size="small" sx={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', bgcolor: 'rgba(0,0,0,0.45)', color: 'white', backdropFilter: 'blur(6px)', '&:hover': { bgcolor: 'rgba(0,0,0,0.7)' } }}>
 								<ArrowForwardIos fontSize="small" />
 							</IconButton>
 
 							{/* thumbnails */}
-							{images.length > 1 && (
-								<Stack direction="row" spacing={1} sx={{ position: 'absolute', bottom: 8, left: 8, right: 8, justifyContent: 'center' }}>
-									{images.map((img, i) => (
+							{parsedImages.length > 1 && (
+								<Stack direction="row" spacing={1} sx={{ position: 'absolute', bottom: 12, left: 12, right: 12, justifyContent: 'center', flexWrap: 'wrap' }}>
+									{parsedImages.map((img, i) => (
 										<Box
 											key={i}
 											onClick={() => setIdx(i)}
@@ -100,7 +141,10 @@ export default function ApartmentDetails({ apartment, user, onBack }: ApartmentD
 											component="img"
 											src={img}
 											aria-label={`thumbnail-${i + 1}`}
-											sx={{ width: { xs: 48, md: 72 }, height: { xs: 36, md: 48 }, objectFit: 'cover', borderRadius: 1, cursor: 'pointer', border: i === idx ? '2px solid' : '1px solid rgba(255,255,255,0.6)', borderColor: i === idx ? 'primary.main' : 'rgba(255,255,255,0.6)' }}
+											onError={(e: React.SyntheticEvent<HTMLImageElement>) => {
+												e.currentTarget.src = '/placeholder-image.svg';
+											}}
+											sx={{ width: { xs: 54, md: 76 }, height: { xs: 42, md: 54 }, objectFit: 'cover', borderRadius: 1.5, cursor: 'pointer', border: i === idx ? '2px solid' : '1px solid rgba(255,255,255,0.7)', borderColor: i === idx ? 'primary.main' : 'rgba(255,255,255,0.7)', boxShadow: i === idx ? '0 0 0 2px rgba(25,118,210,0.2)' : '0 4px 10px rgba(0,0,0,0.2)' }}
 										/>
 									))}
 								</Stack>
@@ -128,6 +172,7 @@ export default function ApartmentDetails({ apartment, user, onBack }: ApartmentD
 								<Tab icon={<InfoOutlined />} iconPosition="start" label="כללי" sx={{ textTransform: 'none', py: 1, '&.Mui-selected': { color: 'primary.main' } }} />
 								<Tab icon={<HomeOutlined />} iconPosition="start" label="מתקנים" sx={{ textTransform: 'none', py: 1, '&.Mui-selected': { color: 'primary.main' } }} />
 								<Tab icon={<EventNote />} iconPosition="start" label="חוקים" sx={{ textTransform: 'none', py: 1, '&.Mui-selected': { color: 'primary.main' } }} />
+								<Tab icon={<Schedule />} iconPosition="start" label="לוח זמנים" sx={{ textTransform: 'none', py: 1, '&.Mui-selected': { color: 'primary.main' } }} />
 								<Tab icon={<MessageOutlined />} iconPosition="start" label="בעל הדירה" sx={{ textTransform: 'none', py: 1, '&.Mui-selected': { color: 'primary.main' } }} />
 							</Tabs>
 
@@ -154,7 +199,7 @@ export default function ApartmentDetails({ apartment, user, onBack }: ApartmentD
 													<InfoItem label="מיקום" value={(apartment.location || apartment.city || '-') + (apartment.neighborhood ? ' — ' + apartment.neighborhood : '')} />
 													<InfoItem label="רחוב" value={apartment.street ?? '-'} />
 													<InfoItem label="נקודות עניין" value={apartment.nearbyPlaces ?? 'לא צוינו'} />
-													<InfoItem label="תמונות" value={(apartment.images && apartment.images.length) || (apartment.mainImage ? 1 : 0)} />
+													<InfoItem label="תמונות" value={(apartment.images && apartment.images.length) || (apartment.mainImage ? 1 : 0) || (apartment.imageUrl ? 1 : 0)} />
 													<InfoItem label="תאריכים שמורות" value={(apartment.bookedDates && apartment.bookedDates.join(', ')) || 'אין'} />
 												</Stack>
 											</Grid>
@@ -196,6 +241,23 @@ export default function ApartmentDetails({ apartment, user, onBack }: ApartmentD
 							</TabPanel>
 
 							<TabPanel value={tab} index={3}>
+								<Box>
+									<CalendarPicker
+										bookedDates={apartment.bookedDates || []}
+										readOnly={true}
+										title="📅 לוח זמנים - תאריכים תפוסים"
+									/>
+									<Paper sx={{ mt: 3, p: 2, backgroundColor: '#f5f5f5', borderRadius: 2 }}>
+										<Typography variant="body2" sx={{ color: '#666' }}>
+											🔴 <b>בעלים</b> = תאריך שנסגר על ידי בעל הדירה<br />
+											🟠 <b>סגור</b> = תאריך תפוס (הוזמן)<br />
+											🟡 <b>עומד להסגר</b> = סימן שאלה (עלול להיסגר בקרוב)
+										</Typography>
+									</Paper>
+								</Box>
+							</TabPanel>
+
+							<TabPanel value={tab} index={4}>
 								<Box>
 									<Paper sx={sectionSx} elevation={0}>
 										<Typography variant="h6" sx={{ mb: 1 }}>בעל הדירה</Typography>

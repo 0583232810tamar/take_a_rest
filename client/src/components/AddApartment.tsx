@@ -7,6 +7,7 @@ import {
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import DeleteIcon from '@mui/icons-material/Delete';
 import api from '../api';
+import CalendarPicker from './CalendarPicker';
 
 interface AddApartmentProps {
     user: any;
@@ -65,6 +66,9 @@ export default function AddApartment({ user, onSuccess }: AddApartmentProps) {
     const [petsAllowed, setPetsAllowed] = useState(false);
     const [smoking, setSmoking] = useState('forbidden');
 
+    // לוח זמנים - תאריכים תפוסים
+    const [bookedDates, setBookedDates] = useState<Array<{ date: string; status: 'booked' | 'blocked' | 'pending' }>>([]);
+
     // If `user.editingApartment` is present, we are in edit mode and should pre-fill fields
     const editingApartment = (user && (user as any).editingApartment) || null;
 
@@ -108,9 +112,11 @@ export default function AddApartment({ user, onSuccess }: AddApartmentProps) {
             setPetsAllowed(!!a.rules?.petsAllowed);
             setSmoking(a.rules?.smoking || 'forbidden');
             // preview existing image urls
-            setPreviewUrls(a.images || []);
+            setPreviewUrls(a.images || (a.mainImage ? [a.mainImage] : []));
             // clear local File[] so user may upload replacements
             setImages([]);
+            // לוח זמנים
+            setBookedDates(a.bookedDates || []);
         }
     }, [editingApartment]);
 
@@ -124,7 +130,8 @@ export default function AddApartment({ user, onSuccess }: AddApartmentProps) {
         `פרטים ומיקום ${isStep0Incomplete() ? '⚠️' : ''}`,
         `תכולה ואבזור ${isStep1Incomplete() ? '⚠️' : ''}`,
         `מאפיינים נוספים ${isStep2Incomplete() ? '⚠️' : ''}`,
-        `מחירים ותמונות ${isStep3Incomplete() ? '⚠️' : ''}`
+        `מחירים ותמונות ${isStep3Incomplete() ? '⚠️' : ''}`,
+        `📅 לוח זמנים ורדיות`
     ];
 
     const handleNext = () => setActiveStep((prev) => prev + 1);
@@ -222,6 +229,7 @@ export default function AddApartment({ user, onSuccess }: AddApartmentProps) {
             },
             rules: { petsAllowed, smoking },
             phone,
+            bookedDates,
             isApproved: false
         };
 
@@ -249,10 +257,10 @@ export default function AddApartment({ user, onSuccess }: AddApartmentProps) {
 
             // POST vs PUT depending on edit mode
             if (isEditMode && (user.editingApartment && user.editingApartment._id)) {
-                await api.put(`/apartments/${user.editingApartment._id}`, fd, { headers: { 'Content-Type': 'multipart/form-data' } });
+                await api.put(`/apartments/${user.editingApartment._id}`, fd);
                 setStatus({ text: 'שינויים נשמרו בהצלחה!', isError: false });
             } else {
-                await api.post('/apartments', fd, { headers: { 'Content-Type': 'multipart/form-data' } });
+                await api.post('/apartments', fd);
                 setStatus({ text: 'הפרסום נשלח בהצלחה למערכת, והודעה נשלחה למנהל לאישור סופי! 🎉', isError: false });
             }
 
@@ -262,7 +270,7 @@ export default function AddApartment({ user, onSuccess }: AddApartmentProps) {
             }, 1000);
 
         } catch (error: any) {
-            const serverMsg = error.response?.data?.message || error.message || 'שגיאה לא ידועה בתקשורת';
+            const serverMsg = error.response?.data?.error || error.response?.data?.message || error.message || 'שגיאה לא ידועה בתקשורת';
             setStatus({ text: `שגיאה בשמירת הדירה בשרת: ${serverMsg}`, isError: true });
             console.error('שגיאת שרת מפורטת:', error.response?.data);
             throw error;
@@ -491,6 +499,20 @@ export default function AddApartment({ user, onSuccess }: AddApartmentProps) {
                             </Paper>
                         </Grid>
                     </Grid>
+                )}
+
+                {activeStep === 4 && (
+                    <Box>
+                        <Typography variant="body2" sx={{ mb: 2, color: '#666' }}>
+                            📅 סמון את התאריכים התפוסים וידיע אתם עבור בררט. בטוליון: 🔴 = בעלים, 🟠 = סגור, 🟡 = עומד להסגר
+                        </Typography>
+                        <CalendarPicker
+                            bookedDates={bookedDates}
+                            onChange={setBookedDates}
+                            readOnly={false}
+                            title="לוח זמנים - בחר תאריכים"
+                        />
+                    </Box>
                 )}
             </Box>
 

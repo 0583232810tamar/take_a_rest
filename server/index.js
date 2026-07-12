@@ -7,6 +7,7 @@ import dotenv from 'dotenv';
 import helmet from 'helmet';
 import xss from 'xss-clean';
 import rateLimit from 'express-rate-limit';
+import path from 'path';
 
 // ייבוא הראוטים של המערכת
 import authRoutes from './routes/authRoutes.js';
@@ -66,6 +67,9 @@ app.use('/api/auth/register', authLimiter);
 app.use(cors());
 app.use(express.json({ limit: '10kb' })); // הגבלת גודל ה-Body ל-10 קילובייט למניעת קריסת זיכרון השרת
 app.use(express.urlencoded({ extended: true, limit: '10kb' }));
+
+// חשיפה של קבצים סטטיים מ-uploads
+app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
 
 // מחזיר שגיאות תמיד בפורמט JSON במקום HTML כדי שהלקוח יוכל לפרש אותן
 app.use((err, req, res, next) => {
