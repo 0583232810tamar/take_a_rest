@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import api from '../api';
-import { Container, Box, Button, Typography, Paper, Grid, IconButton, Tabs, Tab, Divider, Stack, Fade } from '@mui/material';
+import { Container, Box, Button, Typography, Paper, Grid, IconButton, Tabs, Tab, Divider, Stack, Fade, TextField } from '@mui/material';
 import InfoOutlined from '@mui/icons-material/InfoOutlined';
 import HomeOutlined from '@mui/icons-material/HomeOutlined';
 import EventNote from '@mui/icons-material/EventNote';
@@ -79,6 +79,20 @@ export default function ApartmentDetails({ apartment, user, onBack }: ApartmentD
 	const [idx, setIdx] = useState(0);
 	const heroImage = parsedImages[idx] || '/placeholder-image.svg';
 	const [tab, setTab] = useState(0);
+	const ownerEmail = apartment.ownerEmail || apartment.owner?.email || '';
+	const userEmail = user?.email || '';
+	const userName = user?.name || user?.profile?.name || '';
+
+	const getDefaultEmailMessage = () => `שלום,\n\nאני רוצה לבדוק אפשרות להזמנה של הדירה "${apartment.title}".\n\nשם: ${userName || '---'}\nאימייל: ${userEmail || '---'}\n\nאשמח לתיאום איתך בהקדם.\n\nתודה,`;
+	const [emailMessage, setEmailMessage] = useState<string>(() => getDefaultEmailMessage());
+	const [emailStatus, setEmailStatus] = useState('');
+	const [emailSending, setEmailSending] = useState(false);
+
+	useEffect(() => {
+		if (!emailMessage.trim()) {
+			setEmailMessage(getDefaultEmailMessage());
+		}
+	}, [apartment.title, userName, userEmail]);
 
 	const sectionSx = { p: 3, borderRadius: 2, boxShadow: 1, mb: 3, bgcolor: 'background.paper' };
 	const cardSx = { p: 2.5, borderRadius: 2, boxShadow: 1, mb: 3, bgcolor: 'background.paper' };
@@ -98,6 +112,28 @@ export default function ApartmentDetails({ apartment, user, onBack }: ApartmentD
 
 	const next = () => setIdx(i => (i + 1) % Math.max(1, parsedImages.length));
 	const prev = () => setIdx(i => (i - 1 + Math.max(1, parsedImages.length)) % Math.max(1, parsedImages.length));
+
+	const handleOrderClick = () => setTab(3);
+	const handleSendEmailClick = async () => {
+		if (!ownerEmail || !apartment._id) return;
+		setEmailSending(true);
+		setEmailStatus('');
+
+		const message = emailMessage.trim() || `שלום,\n\nאני רוצה לבדוק אפשרות להזמנה של הדירה "${apartment.title}".\n\nשם: ${userName || '---'}\nאימייל: ${userEmail || '---'}\n\nאשמח לתיאום איתך בהקדם.\n\nתודה,`;
+
+		try {
+			const response = await api.post('/messages/send-email', {
+				apartmentId: apartment._id,
+				message
+			});
+			setEmailStatus(response.data.previewUrl ? `המייל נשלח בהצלחה!\nקישור תצוגה: ${response.data.previewUrl}` : 'המייל נשלח בהצלחה!');
+		} catch (error: any) {
+			console.error('send email error', error);
+			setEmailStatus('שגיאה בשליחת המייל. בדוק את השרת או קונסול הדפדפן.');
+		} finally {
+			setEmailSending(false);
+		}
+	};
 
 	// keyboard shortcuts for carousel
 	useEffect(() => {
@@ -303,8 +339,34 @@ export default function ApartmentDetails({ apartment, user, onBack }: ApartmentD
 						<Paper sx={{ p: 3, borderRadius: 2, boxShadow: 3, minWidth: 220 }}>
 							<Typography variant="h6" fontWeight={800} sx={{ mb: 1 }}>₪{displayPrice}</Typography>
 							<Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>מחיר ללילה</Typography>
-							<Button variant="contained" color="primary" fullWidth sx={{ py: 1.5, fontWeight: 700, mb: 1 }}>הזמנה</Button>
-							<Button variant="outlined" fullWidth onClick={() => {}} sx={{ py: 1 }}>שלח הודעה לבעל הדירה</Button>
+					<Button
+						variant="contained"
+						color="primary"
+						fullWidth
+						onClick={handleOrderClick}
+						sx={{ py: 1.5, fontWeight: 700, mb: 1 }}
+					>
+						הזמנה
+					</Button>
+					<Button
+						variant="outlined"
+						fullWidth
+						onClick={handleSendEmailClick}
+						disabled={!ownerEmail || emailSending}
+						sx={{ py: 1 }}
+					>
+						{emailSending ? 'שולח...' : 'שלח הודעה לבעל הדירה'}
+					</Button>
+					{emailStatus && (
+						<Typography variant="caption" color={emailStatus.includes('שגיאה') ? 'error' : 'success.main'} sx={{ mt: 1, display: 'block', textAlign: 'center', whiteSpace: 'pre-wrap' }}>
+							{emailStatus}
+						</Typography>
+					)}
+					{!ownerEmail && (
+						<Typography variant="caption" color="error" sx={{ mt: 1, display: 'block', textAlign: 'center' }}>
+							אין כתובת אימייל זמינה לשולח
+						</Typography>
+					)}
 						</Paper>
 					</Box>
 				</Grid>
