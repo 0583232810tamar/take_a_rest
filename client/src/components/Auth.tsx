@@ -22,7 +22,7 @@ export default function Auth({ onLoginSuccess }: AuthProps) {
         e.preventDefault();
         setMessage({ text: '', isError: false });
 
-        const endpoint = isLogin ? '/auth/login' : '/auth/register';
+        const endpoint = isLogin ? '/api/auth/login' : '/auth/register';
         
         // בניית הגוף של הבקשה בהתאם לסוג הפעולה
         const payload = isLogin 

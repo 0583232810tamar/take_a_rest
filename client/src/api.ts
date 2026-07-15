@@ -1,7 +1,11 @@
 import axios from 'axios';
 
+const baseURL = window.location.hostname === 'localhost' 
+  ? 'http://localhost:5001' 
+  : 'https://take-a-rest.onrender.com';
+
 const api = axios.create({
-    baseURL: 'https://take-a-rest.onrender.com'
+    baseURL: baseURL
 });
 
 // הוספת הטוקן לכל בקשה באופן אוטומטי

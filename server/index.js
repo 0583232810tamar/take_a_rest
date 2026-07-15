@@ -68,12 +68,25 @@ const authLimiter = rateLimit({
 app.use('/api/auth/login', authLimiter);
 app.use('/api/auth/register', authLimiter);
 
-// קונפיגורציית CORS ופארסר מובנה
+const allowedOrigins = [
+  "https://take-a-rest.vercel.app", 
+  "http://localhost:5173", // הכתובת של ה-React (לפעמים זה 5173 או 3000)
+  "http://localhost:5176"  // הכתובת שהופיעה לך בשגיאה
+];
+
 app.use(cors({
-  origin: ["https://take-a-rest.vercel.app"], // הכתובת של הלקוח ב-Vercel
+  origin: function (origin, callback) {
+    // מאפשר בקשות ללא origin (כמו ב-Postman או מבקשות שרת) או אם ה-origin ברשימה
+    if (!origin || allowedOrigins.indexOf(origin) !== -1) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
   methods: ["GET", "POST", "PUT", "DELETE"],
   credentials: true
 }));
+
 app.use(express.json({ limit: '10kb' })); // הגבלת גודל ה-Body ל-10 קילובייט למניעת קריסת זיכרון השרת
 app.use(express.urlencoded({ extended: true, limit: '10kb' }));
 
