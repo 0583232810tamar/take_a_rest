@@ -69,7 +69,11 @@ app.use('/api/auth/login', authLimiter);
 app.use('/api/auth/register', authLimiter);
 
 // קונפיגורציית CORS ופארסר מובנה
-app.use(cors());
+app.use(cors({
+  origin: ["https://take-a-rest.vercel.app"], // הכתובת של הלקוח ב-Vercel
+  methods: ["GET", "POST", "PUT", "DELETE"],
+  credentials: true
+}));
 app.use(express.json({ limit: '10kb' })); // הגבלת גודל ה-Body ל-10 קילובייט למניעת קריסת זיכרון השרת
 app.use(express.urlencoded({ extended: true, limit: '10kb' }));
 
@@ -116,11 +120,10 @@ app.use('/api/reviews', reviewRoutes);
 const server = http.createServer(app);
 const io = new Server(server, {
     cors: {
-        origin: "*", 
+        origin: "https://take-a-rest.vercel.app", // לשנות מ-"*" לכתובת האתר שלך
         methods: ["GET", "POST"]
     }
 });
-
 // expose io to routes via app.locals
 app.set('io', io);
 
