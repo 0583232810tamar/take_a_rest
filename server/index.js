@@ -119,7 +119,10 @@ app.use((err, req, res, next) => {
     const status = err.status || 500;
     res.status(status).json({ message: err.message || 'Server Error', error: err.stack ? String(err.stack) : undefined });
 });
-
+app.use((req, res, next) => {
+    console.log(`Incoming Request: ${req.method} ${req.url}`);
+    next();
+});
 // --- 🔀 חיבור נתיבי ה-API של האתר ---
 app.use('/api/auth', authRoutes);
 app.use('/api/apartments', apartmentRoutes);

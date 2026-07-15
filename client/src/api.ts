@@ -5,8 +5,7 @@ const baseURL = window.location.hostname === 'localhost'
   : 'https://take-a-rest.onrender.com';
 
 const api = axios.create({
-    baseURL: baseURL
-});
+baseURL: `${baseURL}/api`});
 
 // הוספת הטוקן לכל בקשה באופן אוטומטי
 api.interceptors.request.use((config) => {

@@ -22,12 +22,12 @@ export default function Auth({ onLoginSuccess }: AuthProps) {
         e.preventDefault();
         setMessage({ text: '', isError: false });
 
-        const endpoint = isLogin ? '/api/auth/login' : '/auth/register';
-        
-        // בניית הגוף של הבקשה בהתאם לסוג הפעולה
-        const payload = isLogin 
-            ? { email, password } 
-            : { email, password, name, phone, city };
+        // שינוי לכתובות המדויקות שהשרת מגדיר (ה־api.baseURL כבר שומר /api)
+        const endpoint = isLogin ? '/auth/login' : '/auth/register';
+        // בניית הגוף של הבקשה בהתאם לסוג הפעולה - מייצרים `fullName` לפי השרת
+        const payload = isLogin
+            ? { email, password }
+            : { email, password, fullName: name, phone, city };
 
         try {
             const response = await api.post(endpoint, payload);
